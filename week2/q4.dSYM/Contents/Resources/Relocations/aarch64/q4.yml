@@ -1,0 +1,8 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/mohammed/code/scientificComputing/week2/q4'
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _mirror, symObjAddr: 0x0, symBinAddr: 0x100003D9C, symSize: 0xE8 }
+  - { offsetInCU: 0x4D, offset: 0x4D, size: 0x8, addend: 0x0, symName: _mirror, symObjAddr: 0x0, symBinAddr: 0x100003D9C, symSize: 0xE8 }
+  - { offsetInCU: 0xC9, offset: 0xC9, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0xE8, symBinAddr: 0x100003E84, symSize: 0xE0 }
+...

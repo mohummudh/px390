@@ -1,0 +1,11 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/mohammed/code/scientificComputing/assignment3/assign3forCSV'
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _PrintCurrent, symObjAddr: 0x0, symBinAddr: 0x10000388C, symSize: 0xC4 }
+  - { offsetInCU: 0x41, offset: 0x41, size: 0x8, addend: 0x0, symName: _PrintCurrent, symObjAddr: 0x0, symBinAddr: 0x10000388C, symSize: 0xC4 }
+  - { offsetInCU: 0xD5, offset: 0xD5, size: 0x8, addend: 0x0, symName: _Initialise, symObjAddr: 0xC4, symBinAddr: 0x100003950, symSize: 0x108 }
+  - { offsetInCU: 0x169, offset: 0x169, size: 0x8, addend: 0x0, symName: _CalculateNext, symObjAddr: 0x1CC, symBinAddr: 0x100003A58, symSize: 0x1EC }
+  - { offsetInCU: 0x20D, offset: 0x20D, size: 0x8, addend: 0x0, symName: _MemSwap, symObjAddr: 0x3B8, symBinAddr: 0x100003C44, symSize: 0x3C }
+  - { offsetInCU: 0x24D, offset: 0x24D, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x3F4, symBinAddr: 0x100003C80, symSize: 0x294 }
+...
