@@ -128,33 +128,6 @@ int solve_Ax_eq_b(band_mat *bmat, double *x, double *b) {
     return info;
 }
 
-/* Calculates the 1D element index corresponding to a specific grid point.
- *
- * @param j X-coordinate of the grid point.
- * @param p Y-coordinate of the grid point.
- * @param P Total number of grid points in the y-direction.
- *
- * @return The 1D element index corresponding to the grid point.
- */
-long indx(long j, long p, long P) {
-    return j * P + p;
-}
-
-/* Calculates the 2D grid point coordinates corresponding to a 1D element index.
- *
- * @param indx The 1D element index.
- * @param P The total number of grid points in the y-direction.
- * @param j Output: will contain the x-coordinate of the grid point.
- * @param p Output: will contain the y-coordinate of the grid point.
- * 
- */
-void gridp(long indx, long P, long *j, long *p) {
-    // Calculate y-coordinate (p) using modulo operation
-    *p = indx % P;
-    // Calculate x-coordinate (j) using integer division
-    *j = (indx - *p) / P;
-}
-
 /* Swaps the contents of two double pointers.
  *
  * @param a Pointer to the first double pointer.
@@ -196,11 +169,11 @@ int printVector(FILE *file, double **vector, int Na, long int **pos, int Ny, dou
         long int y = (*pos)[j] % Ny;
 
         // Print formatted output with time, coordinates, and vector value
-        fprintf(file, "%.6f, %ld, %ld, %.6f\n", time, x, y, (*vector)[j]);
+        fprintf(file, "%.6f %ld %ld %.6f\n", time, x, y, (*vector)[j]);
     }
 
-    // Print a newline at the end
-    fprintf(file, "\n");
+    // // Print a newline at the end
+    // fprintf(file, "\n");
 
     return 0;
 }
@@ -243,7 +216,7 @@ int main() {
     // Declare a band matrix structure named A - 
     band_mat A;
     // Initialise the band matrix A with specified parameters - how come Na?
-    init_band_mat(&A, Na, Na, Na); 
+    init_band_mat(&A, Ny, Ny, Na); 
 
     // Allocate memory for the starting vector and next vectors (in Ax = b)
     // These vectors will onLy be used for active grid cells.
@@ -274,18 +247,18 @@ int main() {
         exit(1); // Exit with error code
     }
 
-    long *equation_indx = malloc(Ny * Ny * sizeof(long)); // Allocate memory for equation_indx array
-    if (equation_indx == NULL) {
-        fprintf(stderr, "Error allocating memory for equation_indx array\n");
+    long *equationIndex = malloc(Ny * Ny * sizeof(long)); // Allocate memory for equationIndex array
+    if (equationIndex == NULL) {
+        fprintf(stderr, "Error allocating memory for equationIndex array\n");
         free(index); // Free previously allocated memory for index in case of error
         exit(1); // Exit with error code
     }
 
-    // Initialize equation_indx array to -1, indicating uNassigned equations
+    // Initialize equationIndex array to -1, indicating uNassigned equations
     for (int i = 0; i < Ny * Ny; i++) {
-        equation_indx[i] = -1;
+        equationIndex[i] = -1;
     }
-
+    
     // Calculate maximum value of the solution (potential scaling factor)
     double max_u = sqrt(fabs(lambda));
 
@@ -305,7 +278,7 @@ int main() {
             fclose(coeff);
             // Free previously allocated memory (if aNy) to avoid leaks
             free(index);
-            free(equation_indx);
+            free(equationIndex);
             free(x);
             free(b);
             return 0;
@@ -317,13 +290,13 @@ int main() {
         }
 
         // Print the read coefficient for debugging purposes
-        printf("Coeff Read     = %lf\n", b[i]);
+        // printf("Coeff Read     = %lf\n", b[i]);
 
         // Calculate the index in the matrix using the function indx(j, p, Ny)
-        index[i] = indx(j, p, Ny);
+        index[i] = j * Ny + p;
 
-        // Assign the equation index to the corresponding element in equation_indx
-        equation_indx[indx(j, p, Ny)] = i;
+        // Assign the equation index to the corresponding element in equationIndex
+        equationIndex[index[i]] = i;
     }
 
     // Close the coefficients file
@@ -333,80 +306,107 @@ int main() {
     int cor = lambda < 0 ? -1 : 1;
 
     /*Each B is an upper bound for the timestep */
-    double B1 = ((0.5*dx*dx*dy*dy)/( dx*dx + dy*dy));
-    double B2;
-    if(max_u > sqrt(lambda*cor) && max_u > 0){
-        B2 = 1/(max_u*(sqrt(lambda*cor)+max_u));
+    double bound = ((0.5 * dx * dx * dy * dy)/( dx * dx + dy * dy));
+    if(max_u == 0 && lambda == 0){
+        ;
     } else {
-        B2 = 1/(2*lambda*cor);
+        bound = fmin(bound,1/(max_u*(sqrt(lambda*cor)+max_u)));
     }
+    bound = fmin(bound, tD);
+    // printf("Max_u     = %lf\n",max_u);
+    // printf("Diagnostic timestep     = %lf\n", tD);
+    // printf("spatial bound           = %lf\n", bound);
+    // printf("max bound               = %lf\n",1/(max_u * (sqrt(lambda * cor)+max_u)));
 
-    // Find the minimum value between B1 and B2
-    double min_bound = fmin(B1, B2);
-
-    // Print diagnostic information with clear labels
-    printf("Max_u:                 %lf\n", max_u);
-    printf("Diagnostic timestep:   %lf\n", tD);
-    printf("Spatial bound:         %lf\n", B1);
-    printf("Maximum bound:         %lf\n", 1 / (max_u * (sqrt(lambda) + max_u)));
-    printf("Non-linear term bound: %lf\n", 1 / (2 * lambda));
-
-
-    // Initialize timestep and factor variables
-    double dt = tD;
     int factor = 1;
-
-    // Calculate the smallest timestep that is less than or equal to the minimum bound
-    while (dt > min_bound) {
-        factor++;
-        dt = tD / factor;
+    double dt = tD;
+    while(dt > bound){
+        factor = factor + 1;
+        dt = tD/factor;
     }
-
-    // Print the chosen timestep
-    printf("Timestep dt          = %lf\n", dt);
+    // printf("Timestep dt             = %lf\n", dt);
 
     // Iterate through each equation in the system
-    for (int i = 0; i < Na; i++) {
-        // Set the diagoNal element of the matrix to 1
-        setv(&A, i, i, 1);
+    int top;
+    int bottom;
+    int left;
+    int right;
 
-        // Determine neighboring active grid points based on index values
-        bool top = (index[i] % Ny != Ny - 1) && (index[i + 1] - index[i] == 1);
-        bool bottom = (index[i] % Ny != 0) && (index[i] - index[i - 1] == 1);
-        bool left = (index[i] >= Ny) && (equation_indx[index[i] - Ny] != -1);
-        bool right = (index[i] < (Nx - 1) * Ny) && (equation_indx[index[i] + Ny] != -1);
+    for(int i=0;i<Na;i++){
+        
+        if(index[i]%Ny == Ny - 1){
+        //If on top row
+        top = -1;
+        }else{
+        top = equationIndex[index[i] + 1];
+        }
 
-        // Modify matrix elements based on boundary conditions and neighboring grid points
-        if(bottom){
-            setv(&A, i , i - 1  , -(dt)/(dy*dy));
-            setv(&A, i , i  , getv(&A,i,i) +(dt)/(dy*dy));
-        } 
-        if(top){
-            setv(&A, i , i + 1  , -(dt)/(dy*dy));
-            setv(&A, i , i  , getv(&A,i,i) +(dt)/(dy*dy));
+        if(index[i]%Ny == 0){
+        //bottom row
+        bottom = -1;
+        }else{
+        bottom = equationIndex[index[i] - 1];
         }
-        if(right){
-            setv(&A, i , equation_indx[index[i] + Ny]  , -(dt)/(dx*dx));
-            setv(&A, i , i  , getv(&A,i,i) +(dt)/(dx*dx));
+    
+        if(index[i] < Ny){
+        //Left column
+        left = -1;
+        }else{
+        left = equationIndex[index[i] - Ny];
         }
-        if(left){
-            setv(&A, i , equation_indx[index[i] - Ny]  , -(dt)/(dx*dx));
-            setv(&A, i , i  , getv(&A,i,i) +(dt)/(dx*dx));
+
+        if(index[i] >= (Nx-1)*Ny  ){
+        //right column
+        right = -1;
+        }else{
+        right = equationIndex[index[i] + Ny];
+        }
+
+        
+        setv(&A, i, i, 1+2*(dt)/(dy*dy)+2*(dt)/(dx*dx));
+        if(bottom == -1){
+        setv(&A, i , i  , getv(&A,i,i) - (dt)/(dy*dy));
+        }else{
+        setv(&A, i , bottom  , - (dt)/(dy*dy));
+        }
+        if(top == -1){
+        setv(&A, i , i  , getv(&A,i,i) - (dt)/(dy*dy));
+        }else{
+        setv(&A, i , top  , - (dt)/(dy*dy));
+        }
+        if(right == -1){
+        setv(&A, i , i  , getv(&A,i,i) - (dt)/(dx*dx));
+        }else{
+        setv(&A, i , right  , - (dt)/(dx*dx));
+        }
+        if(left == -1){
+        setv(&A, i , i  , getv(&A,i,i) - (dt)/(dx*dx));
+        }else{
+        setv(&A, i , left  , - (dt)/(dx*dx));
         }
     }
 
-    // Free the memory allocated for equation_indx
-    free(equation_indx);
+    // Free the memory allocated for equationIndex
+    free(equationIndex);
   
     // Open output file for writing
     FILE *out = fopen("output.txt", "w");
+    if(printVector(out, &b, Na, &index, Ny, 0.0)==1){
+        perror("Error printing output\n");
+        finalise_band_mat(&A);
+        free(index);
+        free(equationIndex);
+        free(x);
+        free(b);
+        return 0;
+    }
 
     // Print initial solution
     printVector(out, &b, Na, &index, Ny, 0.0);
 
     // Calculate number of iterations
     int iter = floor(tf / dt);
-    printf("Iterations: %d\n", iter);
+    // printf("Iterations: %d\n", iter);
 
     // Time stepping loop
     for (int i = 1; i <= iter; i++) {
@@ -420,11 +420,18 @@ int main() {
 
         // Swap solution and temporary vectors
         MemSwap(&x, &b);
-        // Print solution at specific time intervals
-        double tolerance = 1e-5; // A small number close to the precision you expect
-        double checkTime = dt * factor;
-        if (fmod(i * dt, checkTime) < tolerance || fabs(i * dt - checkTime) < tolerance) {
-        printVector(out, &b, Na, &index, Ny, i * dt);
+
+        if (i%factor == 0) {
+            if(printVector(out, &b, Na, &index, Ny, i*dt)==1){
+                perror("Error printing to output file\n");
+                fclose(out);
+                finalise_band_mat(&A);
+                free(index);
+                free(equationIndex);
+                free(x);
+                free(b);
+                return 0;
+            }
         }
     }
 

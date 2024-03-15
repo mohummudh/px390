@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "a5.C": "cpp"
+        "a5.C": "cpp",
+        "vector": "c",
+        "iosfwd": "c",
+        "variant": "c"
     }
 }
